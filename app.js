@@ -6,6 +6,24 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+// Add click event to map to fill coordinates
+map.on('click', function(e) {
+    const lat = e.latlng.lat.toFixed(6);
+    const lng = e.latlng.lng.toFixed(6);
+
+    document.getElementById('lat').value = lat;
+    document.getElementById('lng').value = lng;
+
+    // Optional: Show a temporary marker at clicked location
+    const tempMarker = L.marker([lat, lng]).addTo(map);
+    tempMarker.bindPopup(`Clicked location:<br>Lat: ${lat}<br>Lng: ${lng}`).openPopup();
+
+    // Remove temp marker after 3 seconds
+    setTimeout(() => {
+        map.removeLayer(tempMarker);
+    }, 3000);
+});
+
 // Function to load features from the backend
 async function loadFeatures() {
     try {
@@ -46,7 +64,8 @@ document.getElementById('featureForm').addEventListener('submit', async (e) => {
         });
         
         if (response.ok) {
-            addMarker(feature);
+            // Reload all features to ensure consistency
+            loadFeatures();
             document.getElementById('message').textContent = 'Feature added successfully!';
             document.getElementById('message').style.color = 'green';
             document.getElementById('featureForm').reset();

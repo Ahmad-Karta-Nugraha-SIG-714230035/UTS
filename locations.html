@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Locations - GIS Application</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .locations-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .locations-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .locations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .location-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .location-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .location-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .location-coords {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .location-category {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .category-landmark { background: #ff6b6b; color: white; }
+        .category-park { background: #51cf66; color: white; }
+        .category-building { background: #74c0fc; color: white; }
+        .category-other { background: #ffd43b; color: black; }
+
+        .location-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        .btn-edit {
+            background: #74c0fc;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #339af0;
+        }
+
+        .btn-delete {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #fa5252;
+        }
+
+        .btn-back {
+            background: #868e96;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .btn-back:hover {
+            background: #6c757d;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .modal h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>GIS Application</h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/" class="nav-link">Map</a></li>
+                <li><a href="/locations" class="nav-link active">Manage Locations</a></li>
+            </ul>
+        </nav>
+        <div class="page-header">
+            <h2>Manage Saved Locations</h2>
+            <p>View, edit, and delete your GIS features</p>
+        </div>
+    </header>
+
+    <main class="locations-container">
+        <div id="locations-list" class="loading">
+            Loading locations...
+        </div>
+    </main>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <h2>Edit Location</h2>
+            <form id="edit-form">
+                <div class="form-group">
+                    <label for="edit-name">Name:</label>
+                    <input type="text" id="edit-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-lat">Latitude:</label>
+                    <input type="number" id="edit-lat" step="any" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-lng">Longitude:</label>
+                    <input type="number" id="edit-lng" step="any" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-category">Category:</label>
+                    <select id="edit-category" required>
+                        <option value="landmark">Landmark</option>
+                        <option value="park">Park</option>
+                        <option value="building">Building</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-back" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-edit">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentEditingId = null;
+
+        // Load locations when page loads
+        document.addEventListener('DOMContentLoaded', loadLocations);
+
+        function goBack() {
+            window.location.href = '/';
+        }
+
+        async function loadLocations() {
+            try {
+                const response = await fetch('/api/features');
+                const locations = await response.json();
+
+                const container = document.getElementById('locations-list');
+
+                if (locations.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <h3>No locations saved yet</h3>
+                            <p>Go back to the map and add some locations first.</p>
+                            <button class="btn btn-edit" onclick="goBack()">Go to Map</button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = '<div class="locations-grid" id="locations-grid"></div>';
+                const grid = document.getElementById('locations-grid');
+
+                locations.forEach(location => {
+                    const card = createLocationCard(location);
+                    grid.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error('Error loading locations:', error);
+                document.getElementById('locations-list').innerHTML = `
+                    <div class="empty-state">
+                        <h3>Error loading locations</h3>
+                        <p>Please try again later.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function createLocationCard(location) {
+            const card = document.createElement('div');
+            card.className = 'location-card';
+
+            card.innerHTML = `
+                <div class="location-name">${location.name}</div>
+                <div class="location-coords">
+                    Lat: ${location.lat.toFixed(6)}, Lng: ${location.lng.toFixed(6)}
+                </div>
+                <span class="location-category category-${location.category}">${location.category}</span>
+                <div class="location-actions">
+                    <button class="btn btn-edit" onclick="editLocation('${location.id || location._id}')">Edit</button>
+                    <button class="btn btn-delete" onclick="deleteLocation('${location.id || location._id}')">Delete</button>
+                </div>
+            `;
+
+            return card;
+        }
+
+        function editLocation(id) {
+            // Fetch current location data
+            fetch(`/api/features`)
+                .then(response => response.json())
+                .then(locations => {
+                    const location = locations.find(loc => (loc.id || loc._id) === id);
+                    if (location) {
+                        document.getElementById('edit-name').value = location.name;
+                        document.getElementById('edit-lat').value = location.lat;
+                        document.getElementById('edit-lng').value = location.lng;
+                        document.getElementById('edit-category').value = location.category;
+
+                        currentEditingId = id;
+                        document.getElementById('edit-modal').style.display = 'block';
+                    }
+                })
+                .catch(error => console.error('Error fetching location:', error));
+        }
+
+        function closeModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+            currentEditingId = null;
+        }
+
+        function deleteLocation(id) {
+            if (confirm('Are you sure you want to delete this location?')) {
+                fetch(`/api/features/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        loadLocations(); // Reload the list
+                        alert('Location deleted successfully!');
+                    } else {
+                        alert('Error deleting location.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting location:', error);
+                    alert('Error deleting location.');
+                });
+            }
+        }
+
+        // Handle edit form submission
+        document.getElementById('edit-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const updatedLocation = {
+                name: document.getElementById('edit-name').value,
+                lat: parseFloat(document.getElementById('edit-lat').value),
+                lng: parseFloat(document.getElementById('edit-lng').value),
+                category: document.getElementById('edit-category').value
+            };
+
+            try {
+                const response = await fetch(`/api/features/${currentEditingId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatedLocation)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadLocations(); // Reload the list
+                    alert('Location updated successfully!');
+                } else {
+                    alert('Error updating location.');
+                }
+            } catch (error) {
+                console.error('Error updating location:', error);
+                alert('Error updating location.');
+            }
+        });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('edit-modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
